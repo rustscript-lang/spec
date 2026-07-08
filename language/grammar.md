@@ -173,4 +173,4 @@ ClosureExpr ::= "||" Expr | "|" ClosureParams? "|" Expr
 ClosureParams ::= Identifier ("," Identifier)*
 ```
 
-The RustScript dialect does not enable JavaScript-style arrow closures; those are parser infrastructure for other frontends.
+JavaScript-style arrow closures are not part of RustScript.
