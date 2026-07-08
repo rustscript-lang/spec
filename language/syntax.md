@@ -164,15 +164,19 @@ while condition {
 
 ### For statement
 
-RustScript currently supports C-style for loops:
+RustScript uses Rust-style range `for` loops:
 
 ```rustscript
-for (let mut i = 0; i < 10; i = i + 1) {
+for i in 0..10 {
+    statement;
+}
+
+for i in 0..=10 {
     statement;
 }
 ```
 
-The initializer may be a `let`, assignment, increment, or expression. The post clause may be assignment, increment, or expression.
+`..` is an exclusive integer range, and `..=` is inclusive. Parenthesized C-style loop heads are rejected. Use `while` for custom steps or descending loops.
 
 ### Loop control
 

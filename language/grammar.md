@@ -61,9 +61,8 @@ Increment ::= "++" Identifier | Identifier "++"
 
 IfStmt ::= "if" Expr Block ("else" (IfStmt | Block))?
 WhileStmt ::= "while" Expr Block
-ForStmt ::= "for" "(" ForInit ";" Expr ";" ForPost ")" Block
-ForInit ::= LetStmt | Assignment | Increment | Expr
-ForPost ::= Assignment | Increment | Expr
+ForStmt ::= "for" "mut"? Identifier "in" RangeExpr Block
+RangeExpr ::= Expr (".." | "..=") Expr
 Block ::= "{" Statement* "}"
 ```
 
