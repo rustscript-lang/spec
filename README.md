@@ -11,6 +11,7 @@ The specification is implementation-derived, but the public text is intentionall
 - [Lexical structure](language/lexical.md)
 - [Syntax](language/syntax.md)
 - [Grammar sketch](language/grammar.md)
+- [TextMate grammar](syntaxes/rustscript.tmLanguage.json)
 
 ### Runtime and tooling contracts
 
