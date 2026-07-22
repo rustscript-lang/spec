@@ -164,7 +164,7 @@ while condition {
 
 ### For statement
 
-RustScript uses Rust-style range `for` loops:
+RustScript supports Rust-style integer ranges and borrowed map entry iteration:
 
 ```rustscript
 for i in 0..10 {
@@ -174,9 +174,19 @@ for i in 0..10 {
 for i in 0..=10 {
     statement;
 }
+
+for (key, value) in &map_value {
+    statement;
+}
+
+for (key: string, value: int) in &typed_map {
+    statement;
+}
 ```
 
-`..` is an exclusive integer range, and `..=` is inclusive. Parenthesized C-style loop heads are rejected. Use `while` for custom steps or descending loops.
+`..` is an exclusive integer range, and `..=` is inclusive. Borrowed map iteration visits each entry once without creating a `keys` array or performing a second lookup. Its order is unspecified. The map local is immutably borrowed for the loop body and cannot be assigned to or mutated there. Loop bindings are immutable unless a future pattern form explicitly declares otherwise.
+
+Because `map<T>` describes the value type while map keys remain dynamic, strict-typing code should annotate a key binding when its concrete type is required. Parenthesized C-style loop heads are rejected. Use `while` for custom steps or descending loops.
 
 ### Loop control
 
