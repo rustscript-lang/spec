@@ -1,0 +1,162 @@
+// RustScript Unit / Option / Result contract fixture.
+//
+// Executed by tests/option-result-contract.test.mjs when RUSTSCRIPT_CORE_BIN
+// points at a built pd-vm-run:
+//
+//   RUSTSCRIPT_CORE_BIN=/path/to/pd-vm-run node --test tests/option-result-contract.test.mjs
+//
+// or directly:
+//
+//   pd-vm-run tests/fixtures/option-result.rss
+//
+// Every assertion in the test is a named line printed here. The file must stay
+// runnable on the current RustScript frontend with no host capability beyond
+// println, and it must not use IO or JSON host calls.
+
+// Unit: no declared return type and an explicit `-> ()` are both Unit.
+fn nothing() { }
+
+fn explicit_unit() -> () { }
+
+// Option carried by the Boolean tag, not by payload truthiness.
+fn unwrap_or_absent(value: Option<int>, fallback: int) -> int {
+    match value {
+        Option::Some(inner) => inner,
+        Option::None => fallback,
+    }
+}
+
+// Option propagation: `?` exits this function on None.
+fn relay_option(flag: bool) -> Option<int> {
+    let value: Option<int> = if flag => { Option::Some(1) } else => { Option::None };
+    let item = value?;
+    Option::Some(item + 1)
+}
+
+// Result propagation: `?` returns the exact error type from this function.
+fn checked(flag: bool) -> Result<int, int> {
+    if flag => { Result::Ok(7) } else => { Result::Err(9) }
+}
+
+fn forward(flag: bool) -> Result<string, int> {
+    let number = checked(flag)?;
+    Result::Ok("continued")
+}
+
+// `?` needs the same error type, so the conversion happens before it.
+fn convert(error: string) -> int { 7 }
+
+fn load() -> Result<int, string> { Result::Err("bad") }
+
+fn relay_mapped() -> Result<int, int> {
+    let value: int = load().map_err(convert)?;
+    Result::Ok(value)
+}
+
+struct Record { name: string }
+
+// ---- Unit ----
+let unit: () = ();
+let unit_from_fn: () = nothing();
+let unit_from_explicit: () = explicit_unit();
+println("unit_literal={}", "ok");
+println("unit_fn_returns_unit={}", "ok");
+
+// ---- Option ----
+let some: Option<int> = Option::Some(0);
+let none: Option<int> = Option::None;
+println("option_some={}", unwrap_or_absent(some, -1));
+println("option_none={}", unwrap_or_absent(none, -1));
+
+let some_unit: Option<()> = Option::Some(());
+let some_unit_label = match some_unit {
+    Option::Some(inner) => "some_unit",
+    Option::None => "none",
+};
+println("option_some_unit={}", some_unit_label);
+
+// The identifier inside `Option::Some(...)` is a binding name, never a type
+// test: `Option::Some(int)` binds a local called `int`.
+let five: Option<int> = Option::Some(5);
+let bound_name = match five {
+    Option::Some(int) => int + 1,
+    Option::None => -1,
+};
+println("option_binding_is_binding={}", bound_name);
+
+// ---- Option propagation ----
+println("option_relay={}", unwrap_or_absent(relay_option(true), -1));
+println("option_relay_absent={}", unwrap_or_absent(relay_option(false), -1));
+
+// ---- Result ----
+let ok_value: Result<int, string> = Result::Ok(21);
+let err_value: Result<int, string> = Result::Err("bad input");
+println("result_is_ok={}", ok_value.is_ok());
+println("result_is_err={}", err_value.is_err());
+let matched = match ok_value {
+    Result::Ok(value) => value,
+    Result::Err(error) => -1,
+};
+println("result_match={}", matched);
+
+// ---- Result propagation and error conversion ----
+let forwarded_ok = match forward(true) {
+    Result::Ok(text) => 0,
+    Result::Err(code) => code,
+};
+println("result_forward_ok={}", forwarded_ok);
+let forwarded_err = match forward(false) {
+    Result::Ok(text) => 0,
+    Result::Err(code) => code,
+};
+println("result_forward_err={}", forwarded_err);
+let mapped_err = match relay_mapped() {
+    Result::Ok(value) => value,
+    Result::Err(code) => code,
+};
+println("result_map_err={}", mapped_err);
+
+// ---- Result to Option ----
+let ok_as_option = ok_value.ok();
+let ok_payload = match ok_as_option {
+    Option::Some(value) => value,
+    Option::None => -1,
+};
+println("result_ok_to_option={}", ok_payload);
+
+// ---- Fallible projection `?.` ----
+let record: Record = {name: "crab"};
+let projected = match record?.name {
+    Option::Some(value) => value,
+    Option::None => "missing",
+};
+println("project_field={}", projected);
+
+let table: map<string> = {"a": "one"};
+let absent_key = match table?.["b"] {
+    Option::Some(value) => value,
+    Option::None => "missing",
+};
+println("project_missing_key={}", absent_key);
+let present_key = match table?.["a"] {
+    Option::Some(value) => value,
+    Option::None => "missing",
+};
+println("project_present_key={}", present_key);
+
+// The same projection works on declared arrays and strings.
+struct Grid { cells: [int] }
+
+let grid: Grid = {cells: [10, 20]};
+let grid_cell = match grid?.cells?.[1] {
+    Option::Some(value) => value,
+    Option::None => -1,
+};
+println("project_array_index={}", grid_cell);
+
+let label: string = "abc";
+let label_letter = match label?.[1] {
+    Option::Some(value) => value,
+    Option::None => "missing",
+};
+println("project_string_index={}", label_letter);

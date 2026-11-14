@@ -32,3 +32,28 @@ jobs:
               exit 1
             fi
           done
+
+  contract:
+    name: Language contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Static checks always run: grammar JSON, keyword list, documentation
+      # claims, and fixture shape. The fixture-execution test is skipped here
+      # because it needs a built pd-vm-run, which this repository does not ship.
+      - name: Static contract checks
+        run: node --test --test-skip-pattern='executes the fixture' tests/option-result-contract.test.mjs
+
+      # Opt in to real execution by setting a repository variable named
+      # RUSTSCRIPT_CORE_BIN to the absolute path of pd-vm-run on the runner.
+      # Without it the step is skipped; the same command fails loudly when run
+      # locally with RUSTSCRIPT_CORE_BIN unset, so execution is never assumed.
+      - name: Fixture execution against pd-vm-run
+        if: vars.RUSTSCRIPT_CORE_BIN != ''
+        env:
+          RUSTSCRIPT_CORE_BIN: ${{ vars.RUSTSCRIPT_CORE_BIN }}
+        run: node --test tests/option-result-contract.test.mjs
