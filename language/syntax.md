@@ -274,7 +274,7 @@ value.keys
 
 ## Unit, Option, and Result
 
-`Option` and `Result` are compiler built-ins. They are constructed with namespace-qualified constructors, never with a bare `Some`, `None`, `Ok`, or `Err`:
+`Option` and `Result` are compiler built-ins. They are constructed with namespace-qualified constructors, never with a bare `Some`, `None`, `Ok`, or `Err` (those bare names survive only as legacy optional-slot patterns, covered under Match expression):
 
 ```rustscript
 let some: Option<int> = Option::Some(0);
@@ -296,11 +296,26 @@ value?.field
 value?.[key]
 ```
 
-`?.` is fallible projection and produces a logical `Option` of the projected value. A missing map key, a missing array index, an out-of-range string index, or a receiver that is `Option::None` becomes `Option::None`; a present value becomes `Option::Some`, including `Some(false)`, `Some(0)`, `Some("")`, `Some(())`, and a nested `Some(Option::None)`.
+`?.` is fallible projection and produces a logical `Option` of the projected value. A missing map key, an index outside a declared array, an out-of-range string index, or a receiver that is `Option::None` becomes `Option::None`; a present value becomes `Option::Some`, including `Some(false)`, `Some(0)`, `Some("")`, `Some(())`, and a nested `Some(Option::None)`.
+
+Both the field and the index form work on every declared receiver shape, and they compose:
+
+```rustscript
+struct Data { name: string, arr: [int], table: map<int> }
+
+let data: Data = {name: "crab", arr: [10, 20], table: {a: 1}};
+let name = data?.name;          // Option<string>: Some("crab")
+let item = data?.arr?.[1];      // Option<int>: Some(20)
+let gone = data?.arr?.[5];      // Option<int>: None
+let cell = data?.table?.["a"];  // Option<int>: Some(1)
+let text: string = "abc";
+let letter = text?.[1];         // Option<string>: Some("b")
+let outside = text?.[9];        // Option<string>: None
+```
 
 On an `Option` receiver, `?.` consumes exactly one `and_then`-equivalent layer, so an `Option<int>` leaf yields `Option<Option<int>>` rather than an arbitrary flattening. An absent dynamic key and a present key holding explicit `Option::None` remain distinct.
 
-`?.` requires the receiver to have a declared schema — a struct type or a declared `map<T>`. Optional access on an untyped map literal is rejected.
+The receiver must have a declared schema: a local with an explicit type annotation — a `struct` type, a declared `map<T>`, a declared array such as `[int]`, `string`, or an `Option<T>` of one of these — or a projection rooted in such a local. A value whose type was never declared is rejected: `?.` on an unannotated map literal and on a call result stored without an annotation both fail with `optional access requires a user-declared schema in RustScript`. Annotating the binding (`let data: Data = make();`) is enough.
 
 ### Propagation (`?`)
 
@@ -378,17 +393,22 @@ Supported patterns:
 - string literals
 - bytes literals
 - `Option::None`
-- `Option::Some(name)` binding
-- `Option::Some(TypeName)` type patterns for `int`, `float`, `number`, `bool`, `string`, `bytes`, `array`, `map` and their capitalized names
-- `Result::Ok(name)` and `Result::Err(name)` bindings
-- `Result::Ok(TypeName)` and `Result::Err(TypeName)` type patterns
+- `Option::Some(name)` and `Option::Some(_)` bindings
+- `Result::Ok(name)`, `Result::Ok(_)`, `Result::Err(name)`, and `Result::Err(_)` bindings
 - `_` wildcard
+
+The identifier inside `Option::Some(...)`, `Result::Ok(...)`, and `Result::Err(...)` is always a binding name; these constructors never filter on a type. `Option::Some(int)` declares a binding named `int` and matches any present payload, so it is not a test for an `int` payload. `Option::None` takes no payload, and `Option::None(x)` is rejected as a payload on `None`.
 
 An `Option` match is exhaustive with `Option::Some(binding)` and `Option::None`; a `Result` match is exhaustive with `Result::Ok(binding)` and `Result::Err(binding)`. A wildcard may stand in for the absent branch when the present branch is a constructor arm. Value matches still require a trailing `_` arm, and non-wildcard arms cannot appear after the wildcard arm.
 
 Nested constructor patterns such as `Option::Some(Option::None)`, duplicate arms, and mixing `Option` and `Result` constructor arms in one match are rejected; match the inner value in a second match.
 
-Bare `Some(...)`, `None`, `Ok(...)`, and `Err(...)` are not patterns; a match that uses them falls back to value matching and then requires a `_` arm.
+Bare constructor names belong to a different, retired mechanism and never become `Option::`/`Result::` arms:
+
+- `None` and `Some(name)` are the legacy optional-slot patterns. `None` compares the receiver against the internal Null carrier and `Some(name)` negates that comparison, so both only type-check against a receiver that is a legacy optional slot. A logical `Option::Some`/`Option::None` value is not an optional slot, so a match that writes `Some(value)` or `None` over one fails to compile with `Some(...) and None match patterns require an optional value`. It does not fall back to value matching.
+- `Some(TypeName)` — for example `Some(int)` or `Some(String)` — is the legacy optional-slot *type* pattern. It has no optional-slot precondition: it compiles on any receiver and compares the receiver's type name instead of testing for a present payload, so it is simply false for an `Option` carrier, which is a map. It requires the trailing `_` arm.
+- Because constructor arms and these legacy value patterns are different mechanisms, one match cannot mix them: an `Option` match that pairs `Some(...)` with `Option::None` is rejected with `Option match cannot mix constructor arms with value patterns`.
+- `Ok(...)` and `Err(...)` are not patterns at all; a bare `Ok(value)` or `Err(value)` arm is a parse error.
 
 ## Closures
 

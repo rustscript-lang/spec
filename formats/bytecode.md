@@ -47,7 +47,7 @@ Constant entries are immutable. Mutable arrays, maps, or objects created during 
 
 Type metadata carries logical schemas, and the physical carrier does not by itself define the logical type.
 
-**Unit** has schema `()` and uses the internal Null value as its physical carrier. A Unit slot is not a nullable slot: an explicit source `null` is never inferred into Unit, and a missing payload is not a unit value.
+**Unit** has schema `()` and uses the internal Null value as its physical carrier. A Unit slot is not a nullable slot: an explicit source `null` is never inferred into Unit, and a Null value is Unit only where the declared schema is `()`. Under any other declared schema a Null is not a Unit value, and it is malformed where that schema requires a real payload.
 
 **Option** has a logical `Option<T>` schema and a Map carrier with a Boolean `tag`:
 

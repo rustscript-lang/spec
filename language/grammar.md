@@ -119,6 +119,7 @@ PrimaryExpr ::=
     Literal
   | Identifier CallSuffix?
   | Identifier "::" PathSegments TypeCallArgs? "(" ArgList? ")"
+  | OptionNone
   | "(" Expr ")"
   | ArrayLiteral
   | BraceLiteral
@@ -172,7 +173,7 @@ ResultErr ::= "Result" "::" "Err" "(" Expr ")"
 UnitValue ::= "(" ")"
 ```
 
-`Option::Some` and `Result::Ok`/`Result::Err` are ordinary namespace-qualified constructor calls, so they are already covered by `PrimaryExpr`. The bare forms `Some(...)`, `None`, `Ok(...)`, and `Err(...)` are not constructors in either expression or pattern position; an unqualified `Some(1)` is an unknown-function error at compile time.
+`Option::Some`, `Result::Ok`, and `Result::Err` are ordinary namespace-qualified constructor calls, so they are already covered by `PrimaryExpr`'s namespace-call form. `Option::None` carries no argument list, so `PrimaryExpr` admits it explicitly through `OptionNone`. The bare forms `Some(...)`, `Ok(...)`, and `Err(...)` are not constructors: `Some(1)` is an unknown-function error, bare `None` in expression position is an unknown local, and `Ok(...)`/`Err(...)` are not valid match patterns either. Bare `None` and `Some(name)` survive only as legacy optional-slot match patterns, described below.
 
 ## If and match expressions
 
@@ -187,15 +188,23 @@ MatchPattern ::=
   | StringLiteral
   | BytesLiteral
   | "Option" "::" "None"
-  | "Option" "::" "Some" "(" Identifier ")"
-  | "Option" "::" "Some" "(" MatchTypeName ")"
-  | "Result" "::" "Ok" "(" Identifier ")"
-  | "Result" "::" "Err" "(" Identifier ")"
-  | "Result" "::" "Ok" "(" MatchTypeName ")"
-  | "Result" "::" "Err" "(" MatchTypeName ")"
+  | "Option" "::" "Some" "(" MatchBinding ")"
+  | "Result" "::" "Ok" "(" MatchBinding ")"
+  | "Result" "::" "Err" "(" MatchBinding ")"
+  | LegacyOptionalPattern
   | "_"
+MatchBinding ::= Identifier | "_"
+
+LegacyOptionalPattern ::=
+    "None"
+  | "Some" "(" Identifier ")"
+  | "Some" "(" MatchTypeName ")"
 MatchTypeName ::= "int" | "Int" | "float" | "Float" | "number" | "Number" | "bool" | "Bool" | "string" | "String" | "bytes" | "Bytes" | "array" | "Array" | "map" | "Map"
 ```
+
+`MatchBinding` is a binding name or `_`, never a type test: `Option::Some(int)` binds a local named `int`. `Option::None` takes no payload, and `Option::None(x)` is rejected.
+
+`LegacyOptionalPattern` is the retired optional-slot mechanism, kept here because the parser still accepts it. `Some(name)` binds a payload and needs a receiver that is a legacy optional slot, and `None` needs the same; a logical `Option` value is not an optional slot, so both fail with `Some(...) and None match patterns require an optional value`. `Some(TypeName)` is different: it carries no optional-slot precondition and compiles against any receiver, but it tests the receiver's type name rather than a present payload, so it is false for an `Option` carrier. All three still need the trailing `_` arm, and legacy patterns cannot be mixed with constructor arms in one match (`Option match cannot mix constructor arms with value patterns`). `Ok(...)`/`Err(...)` have no bare form at all — such an arm is a parse error.
 
 An `Option` match is exhaustive with `Option::Some(binding)` and `Option::None`, and a `Result` match is exhaustive with `Result::Ok(binding)` and `Result::Err(binding)`. A wildcard may stand in for the absent branch when the present branch is a constructor arm. Nesting one constructor pattern inside another, and mixing `Option` and `Result` arms in the same match, are rejected; match the inner value in a second match instead. Literal matches still require a trailing `_` arm.
 

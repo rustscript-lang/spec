@@ -75,6 +75,15 @@ let some_unit_label = match some_unit {
 };
 println("option_some_unit={}", some_unit_label);
 
+// The identifier inside `Option::Some(...)` is a binding name, never a type
+// test: `Option::Some(int)` binds a local called `int`.
+let five: Option<int> = Option::Some(5);
+let bound_name = match five {
+    Option::Some(int) => int + 1,
+    Option::None => -1,
+};
+println("option_binding_is_binding={}", bound_name);
+
 // ---- Option propagation ----
 println("option_relay={}", unwrap_or_absent(relay_option(true), -1));
 println("option_relay_absent={}", unwrap_or_absent(relay_option(false), -1));
@@ -134,3 +143,20 @@ let present_key = match table?.["a"] {
     Option::None => "missing",
 };
 println("project_present_key={}", present_key);
+
+// The same projection works on declared arrays and strings.
+struct Grid { cells: [int] }
+
+let grid: Grid = {cells: [10, 20]};
+let grid_cell = match grid?.cells?.[1] {
+    Option::Some(value) => value,
+    Option::None => -1,
+};
+println("project_array_index={}", grid_cell);
+
+let label: string = "abc";
+let label_letter = match label?.[1] {
+    Option::Some(value) => value,
+    Option::None => "missing",
+};
+println("project_string_index={}", label_letter);

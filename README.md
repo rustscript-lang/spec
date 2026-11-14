@@ -59,6 +59,8 @@ Without `RUSTSCRIPT_CORE_BIN` the fixture-execution test fails with an explicit 
 node --test --test-skip-pattern='executes the fixture' tests/option-result-contract.test.mjs
 ```
 
+`--test-skip-pattern` is the flag that actually filters under current Node releases; `--test-name-pattern` does not exclude the fixture-execution test, so this document, the test header, and CI all use the skip pattern.
+
 ## Scope
 
 This draft covers:

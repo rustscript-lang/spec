@@ -14,7 +14,11 @@
 //
 // Static checks only (no binary available):
 //
-//   node --test --test-name-pattern='^(?!.*executes the fixture)' tests/option-result-contract.test.mjs
+//   node --test --test-skip-pattern='executes the fixture' tests/option-result-contract.test.mjs
+//
+// `--test-skip-pattern` is the flag that filters under current Node releases;
+// `--test-name-pattern` no longer implies "run everything else", so README.md
+// and .github/workflows/ci.yml use the skip pattern too.
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -207,6 +211,31 @@ test("the grammar highlights Unit, Option/Result constructors, ? and ?.", () => 
   assert.match(repository["propagation-operator"].match, /\\\?/);
   assert.match(repository["optional-access-operator"].match, /\\\?\\\./);
 
+  // The constructor rule must pair each namespace with its own variants:
+  // `Option::Ok` and `Result::Some` do not exist and must stay unhighlighted.
+  const constructor = new RegExp(repository["option-result-constructor"].match);
+  for (const source of [
+    "Option::Some(1)",
+    "Option::None",
+    "Result::Ok(1)",
+    "Result::Err(2)",
+    "Option :: None",
+  ]) {
+    assert.ok(constructor.test(source), `constructor rule does not highlight ${source}`);
+  }
+  for (const source of ["Option::Ok(1)", "Result::Some(1)", "Option::Err(2)", "Result::None"]) {
+    assert.equal(
+      constructor.test(source),
+      false,
+      `constructor rule highlights the non-existent ${source}`,
+    );
+  }
+  assert.deepEqual(
+    constructor.exec("Option::Some(1)")?.slice(1),
+    ["Option", "", "::", "", "Some"],
+    "constructor captures are 1=namespace, 3=::, 5=variant",
+  );
+
   const includes = (grammar.patterns ?? []).map((pattern) => pattern.include);
   for (const key of [
     "#unit-literal",
@@ -270,10 +299,92 @@ test("documentation describes the current Unit/Option/Result contract", () => {
   }
   const bytecode = read("formats/bytecode.md");
   assert.ok(!/\bnull for procedures\b/.test(bytecode), "bytecode.md keeps the null-procedure text");
+  assert.ok(
+    !/missing payload is not a unit value/.test(bytecode),
+    "bytecode.md still states the unmatchable 'missing payload is not a unit value' rule",
+  );
+  assert.match(
+    bytecode,
+    /a Null value is Unit only where the declared schema is `\(\)`/,
+    "bytecode.md does not scope Unit to the `()` schema",
+  );
   const host = read("runtime/host-functions.md");
   assert.ok(
     !/Procedures should return null/.test(host),
     "host-functions.md keeps the null-procedure text",
+  );
+  assert.ok(
+    !/omitted logical `Option` argument/.test(host),
+    "host-functions.md still claims a host argument may be omitted and normalized to None",
+  );
+  assert.match(
+    host,
+    /No argument is ever omitted/,
+    "host-functions.md does not state that host arguments are always supplied",
+  );
+
+  const syntax = read("language/syntax.md");
+  const grammar = read("language/grammar.md");
+
+  // `Option::X(...)`/`Result::X(...)` bind; they are not type patterns.
+  assert.ok(
+    !/Option::Some\(TypeName\)/.test(syntax),
+    "syntax.md still lists Option::Some(TypeName) as a type pattern",
+  );
+  assert.ok(
+    !/Result::(?:Ok|Err)\(TypeName\)/.test(syntax),
+    "syntax.md still lists Result::Ok(TypeName) as a type pattern",
+  );
+  assert.match(syntax, /always a binding name/, "syntax.md does not state the constructor binding rule");
+  assert.match(syntax, /Option::Some\(int\)/, "syntax.md does not show a type-shaped binding name");
+  assert.match(
+    syntax,
+    /Some\(\.\.\.\) and None match patterns require an optional value/,
+    "syntax.md does not document the legacy optional-slot rejection",
+  );
+  assert.ok(
+    !/falls back to value matching/.test(syntax),
+    "syntax.md still claims bare constructor names fall back to value matching",
+  );
+  assert.match(
+    syntax,
+    /bare `Ok\(value\)` or `Err\(value\)` arm is a parse error/,
+    "syntax.md does not document that bare Ok/Err arms are parse errors",
+  );
+
+  // The `?.` receiver rule covers declared arrays and strings.
+  assert.match(syntax, /data\?\.arr\?\.\[1\]/, "syntax.md does not show array projection");
+  assert.match(syntax, /text\?\.\[9\]/, "syntax.md does not show string projection");
+  assert.ok(
+    !/a struct type or a declared `map<T>`\./.test(syntax),
+    "syntax.md still narrows `?.` receivers to struct and map<T>",
+  );
+
+  // Grammar: one binding production, one legacy production, no dangling rule.
+  assert.match(grammar, /MatchBinding ::= Identifier \| "_"/, "grammar.md has no MatchBinding production");
+  assert.match(grammar, /LegacyOptionalPattern ::=/, "grammar.md has no legacy pattern production");
+  assert.ok(
+    !/"Option" "::" "Some" "\(" MatchTypeName/.test(grammar),
+    "grammar.md still offers a type-name alternative for Option::Some",
+  );
+  assert.ok(
+    !/"Result" "::" "(?:Ok|Err)" "\(" MatchTypeName/.test(grammar),
+    "grammar.md still offers a type-name alternative for Result::Ok/Err",
+  );
+  assert.match(grammar, /OptionNone ::= "Option" "::" "None"/, "grammar.md does not define OptionNone");
+  const primary = grammar.split(/^PrimaryExpr ::=/m)[1]?.split(/^$/m)[0] ?? "";
+  assert.match(primary, /\| OptionNone/, "PrimaryExpr does not admit OptionNone");
+
+  // The debugger note must not claim Unit and None share a carrier.
+  const debuggerDoc = read("runtime/debugger.md");
+  assert.ok(
+    !/Unit and `Option::None` share/.test(debuggerDoc),
+    "debugger.md still claims Unit and Option::None share the Null carrier",
+  );
+  assert.match(
+    debuggerDoc,
+    /`Option::None` is a Map that carries only a Boolean `tag` of `false`/,
+    "debugger.md does not describe the tag-only None carrier",
   );
 });
 
@@ -335,6 +446,7 @@ test("the VM executes the fixture and prints the named contract lines", () => {
     "option_some=0",
     "option_none=-1",
     "option_some_unit=some_unit",
+    "option_binding_is_binding=6",
     "option_relay=2",
     "option_relay_absent=-1",
     "result_is_ok=true",
@@ -347,6 +459,8 @@ test("the VM executes the fixture and prints the named contract lines", () => {
     "project_field=crab",
     "project_missing_key=missing",
     "project_present_key=one",
+    "project_array_index=20",
+    "project_string_index=b",
   ];
   const missing = expected.filter((line) => !lines.has(line));
   assert.deepEqual(

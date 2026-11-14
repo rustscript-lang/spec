@@ -55,7 +55,7 @@ A paused VM exposes a stack trace ordered from the current frame outward. Each f
 - local bindings visible at the current point, where available;
 - closure captures, where available and safe to expose.
 
-Optimized or stripped artifacts may omit local names or values. The debugger should distinguish an unavailable value from a present one, and should report the Unit value as `()` rather than as a missing or null value. Unit and `Option::None` share the internal Null carrier but are different logical values, so a presentation that cannot tell them apart is lossy.
+Optimized or stripped artifacts may omit local names or values. The debugger should distinguish an unavailable value from a present one, and should report the Unit value as `()` rather than as a missing or null value. Unit and `Option::None` are different values on different carriers: Unit's physical carrier is the internal Null value, while `Option::None` is a Map that carries only a Boolean `tag` of `false` and no `payload` entry, and `Option::Some` adds that `payload` entry. A presentation that renders `Option::None` as a bare Null collapses it into Unit, so an inspection view should derive `Option::None` from the tag and show Unit as `()`.
 
 ## Value inspection
 

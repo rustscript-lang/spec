@@ -73,7 +73,7 @@ Variant selection is by the carrier's Boolean `tag`, never by payload truthiness
 - `None`, `Some(0)`, `Some(false)`, `Some("")`, `Some(())`, and nested options are all distinct values. A falsy payload never selects `None`.
 - `Ok(0)`, `Err(0)`, `Ok(false)`, and `Err(false)` are distinct `Result` values for the same reason.
 - `Option::None` is a tagged value. It is not a map deletion and not an omitted field.
-- An omitted logical `Option` argument, where the host contract permits omission, normalizes to `None`; a required argument is still checked.
+- No argument is ever omitted. Host arguments are positional and required, so a call supplies exactly one value per declared parameter; a missing argument is an error, never an implicit `None`. The one place an `Option` may be absent is a `map`/`struct` literal built against a declared schema, where the construction site materializes the omitted field as `Option::None`.
 
 Ownership follows the existing rules. An `Option::Some` or a `Result` payload may own a resource; the unselected branch owns nothing. A selected resource is published, transferred, taken, or closed exactly once through the live-VM publication journal, and unselected branches do not acquire ownership. Borrowed-resource returns are rejected, including nested combinations, and a resource array is not supported by the host handle ABI and is refused with a capability error. Dynamic and unknown payloads, and transport results such as `VmResult` nested inside a payload, are also rejected.
 

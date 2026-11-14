@@ -426,7 +426,7 @@
     },
     "option-result-constructor": {
       "name": "meta.constructor.rss",
-      "match": "\\b(Option|Result)(\\s*)(::)(\\s*)(Some|None|Ok|Err)\\b",
+      "match": "\\b((?:Option)(?=\\s*::\\s*(?:Some|None))|(?:Result)(?=\\s*::\\s*(?:Ok|Err)))(\\s*)(::)(\\s*)(Some|None|Ok|Err)\\b",
       "captures": {
         "1": {
           "name": "support.type.rss"
