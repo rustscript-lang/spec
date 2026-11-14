@@ -33,28 +33,34 @@ Identifier ::= IdentifierStart IdentifierContinue*
 The lexer recognizes these reserved words for RustScript:
 
 ```text
-as break continue else false fn for if let match null pub struct true use while
+as break continue else false fn for if let match pub struct true use while
 ```
 
 The identifier `mut` is context-sensitive after `let` and `&`; it is not a lexer keyword.
 
+`null` is neither a keyword nor a literal. Absence is expressed with the constructor `Option::None`, and "no value produced" is the Unit value `()`. `Option`, `Result`, `Some`, `None`, `Ok`, and `Err` are built-in type and constructor names, not reserved words, so the lexer still treats them as ordinary identifiers and paths.
+
 ## Punctuators and operators
 
 ```text
-! != + ++ += - * / % & && | || ( ) [ ] { } , : ? . ... ; = == => < <= > >=
+! != + ++ += - * / % & && | || ( ) [ ] { } , : ? ?. . ... ; = == => < <= > >=
 ```
 
 The `++` and `+=` tokens are enabled for RustScript. `...` is only used by variadic array type schemas.
 
+`?` and `?.` are distinct operators. `?` is expression-level error or absence propagation and follows its operand with no intervening token. `?.` is fallible projection; the `?` and `.` form one operator, and a projection is written as `receiver?.field` or `receiver?.[index]`. An empty `(` `)` pair spell both the Unit type and the Unit value.
+
 ## Literals
 
-### Null and booleans
+### Booleans and unit
 
 ```rustscript
-null
 true
 false
+()
 ```
+
+`()` in value position is the Unit value. Unit is a logical type whose physical carrier is the VM's internal Null value, so a Unit value is not a source-level `null`: RustScript has no `null` literal, and an explicit `null` in source is rejected rather than silently producing Unit or `Option::None`.
 
 ### Integers
 

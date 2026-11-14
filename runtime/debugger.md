@@ -55,7 +55,7 @@ A paused VM exposes a stack trace ordered from the current frame outward. Each f
 - local bindings visible at the current point, where available;
 - closure captures, where available and safe to expose.
 
-Optimized or stripped artifacts may omit local names or values. The debugger should distinguish unavailable values from null values.
+Optimized or stripped artifacts may omit local names or values. The debugger should distinguish an unavailable value from a present one, and should report the Unit value as `()` rather than as a missing or null value. Unit and `Option::None` share the internal Null carrier but are different logical values, so a presentation that cannot tell them apart is lossy.
 
 ## Value inspection
 
