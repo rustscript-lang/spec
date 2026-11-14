@@ -329,8 +329,17 @@ test("documentation describes the current Unit/Option/Result contract", () => {
   );
   assert.match(
     host,
-    /`missing \{wrapper\} \{param\}`/,
+    /`missing \{wrapper_ident\} \{param\}`/,
     "host-functions.md does not name the wrapper-generated missing-argument error",
+  );
+  assert.match(
+    host,
+    /`missing argument: \{wrapper_ident\} \{param\}`/,
+    "host-functions.md does not name the wrapper-label missing-argument error for other parameter types",
+  );
+  assert.ok(
+    !/missing json::decode/.test(host),
+    "host-functions.md uses a guest path as the missing-argument wrapper label",
   );
   assert.ok(
     !/missing argument: <label>/.test(host),
