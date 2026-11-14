@@ -324,13 +324,17 @@ test("documentation describes the current Unit/Option/Result contract", () => {
   );
   assert.match(
     host,
-    /A `GuestOption<T>` parameter may not be omitted/,
-    "host-functions.md does not document that a guest `Option` argument is required",
+    /A `GuestOption<T>` or `GuestResult<T, E>` parameter may not be omitted/,
+    "host-functions.md does not document that guest `Option`/`Result` arguments are required",
   );
   assert.match(
     host,
-    /missing argument: <label>/,
-    "host-functions.md does not name the missing-argument error",
+    /`missing \{wrapper\} \{param\}`/,
+    "host-functions.md does not name the wrapper-generated missing-argument error",
+  );
+  assert.ok(
+    !/missing argument: <label>/.test(host),
+    "host-functions.md keeps the stale `missing argument: <label>` error text",
   );
   assert.ok(
     !/No argument is ever omitted/.test(host),
