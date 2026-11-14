@@ -319,8 +319,22 @@ test("documentation describes the current Unit/Option/Result contract", () => {
   );
   assert.match(
     host,
-    /No argument is ever omitted/,
-    "host-functions.md does not state that host arguments are always supplied",
+    /A trailing `Option<T>` parameter may be omitted/,
+    "host-functions.md does not document the omittable Rust `Option<T>` parameter",
+  );
+  assert.match(
+    host,
+    /A `GuestOption<T>` parameter may not be omitted/,
+    "host-functions.md does not document that a guest `Option` argument is required",
+  );
+  assert.match(
+    host,
+    /missing argument: <label>/,
+    "host-functions.md does not name the missing-argument error",
+  );
+  assert.ok(
+    !/No argument is ever omitted/.test(host),
+    "host-functions.md keeps the blanket no-omission claim instead of the layered rule",
   );
 
   const syntax = read("language/syntax.md");
@@ -351,6 +365,20 @@ test("documentation describes the current Unit/Option/Result contract", () => {
     /bare `Ok\(value\)` or `Err\(value\)` arm is a parse error/,
     "syntax.md does not document that bare Ok/Err arms are parse errors",
   );
+  assert.ok(
+    !/simply false for an `Option` carrier/.test(syntax),
+    "syntax.md still claims every `Some(TypeName)` is false for an `Option` carrier",
+  );
+  assert.match(
+    syntax,
+    /`Some\(map\)` and `Some\(Map\)` do match an `Option` carrier/,
+    "syntax.md does not document that `Some(map)` matches an `Option` carrier",
+  );
+  assert.match(
+    syntax,
+    /Result match cannot mix constructor arms with value patterns/,
+    "syntax.md does not document the separate Result mixing error",
+  );
 
   // The `?.` receiver rule covers declared arrays and strings.
   assert.match(syntax, /data\?\.arr\?\.\[1\]/, "syntax.md does not show array projection");
@@ -358,6 +386,15 @@ test("documentation describes the current Unit/Option/Result contract", () => {
   assert.ok(
     !/a struct type or a declared `map<T>`\./.test(syntax),
     "syntax.md still narrows `?.` receivers to struct and map<T>",
+  );
+  assert.ok(
+    !/work on every declared receiver shape/.test(syntax),
+    "syntax.md still claims both `?.` forms work on every declared receiver",
+  );
+  assert.match(
+    syntax,
+    /a `bytes` receiver lowers to `Option::None`/,
+    "syntax.md does not state the `bytes` projection boundary",
   );
 
   // Grammar: one binding production, one legacy production, no dangling rule.
