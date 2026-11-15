@@ -38,7 +38,7 @@ as break continue else false fn for if let match pub struct true use while
 
 The identifier `mut` is context-sensitive after `let` and `&`; it is not a lexer keyword.
 
-`null` is neither a keyword nor a literal. Absence is expressed with the constructor `Option::None`, and "no value produced" is the Unit value `()`. `Option`, `Result`, `Some`, `None`, `Ok`, and `Err` are built-in type and constructor names, not reserved words, so the lexer still treats them as ordinary identifiers and paths.
+`null` is neither a keyword nor a literal. Absence is expressed with the constructor `None`, and "no value produced" is the Unit value `()`. `Some` and `None` are reserved constructor names in RustScript expression and match-pattern positions; they cannot be ordinary variable names. The parser interprets them contextually without reserving lexer tokens, so member names such as `obj.None` and quoted keys such as `{"None": 1}` remain available. `Option` and `Result` are built-in type names; `Ok` and `Err` are qualified `Result` constructor names. Other parser dialects retain their own interpretations of these identifier tokens.
 
 ## Punctuators and operators
 
@@ -60,7 +60,7 @@ false
 ()
 ```
 
-`()` in value position is the Unit value. Unit is a logical type whose physical carrier is the VM's internal Null value, so a Unit value is not a source-level `null`: RustScript has no `null` literal, and an explicit `null` in source is rejected rather than silently producing Unit or `Option::None`.
+`()` in value position is the Unit value. Unit is a logical type whose physical carrier is the VM's internal Null value, so a Unit value is not a source-level `null`: RustScript has no `null` literal, and an explicit `null` in source is rejected rather than silently producing Unit or `None`.
 
 ### Integers
 

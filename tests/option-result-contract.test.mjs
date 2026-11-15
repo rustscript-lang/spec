@@ -194,7 +194,7 @@ test("the TextMate keyword rules match the lexical keyword list", () => {
   );
 });
 
-test("the grammar highlights Unit, Option/Result constructors, ? and ?.", () => {
+test("the grammar highlights Unit, bare Option and qualified Result constructors, ? and ?.", () => {
   const grammar = JSON.parse(readDoc(grammarPath));
   const repository = grammar.repository;
   for (const key of [
@@ -206,35 +206,34 @@ test("the grammar highlights Unit, Option/Result constructors, ? and ?.", () => 
     assert.ok(key in repository, `grammar is missing the #${key} rule`);
   }
   assert.match(repository["unit-literal"].match, /\\\(\\\)/, "unit rule must match ()");
-  assert.match(repository["option-result-constructor"].match, /Option/);
-  assert.match(repository["option-result-constructor"].match, /Result/);
+  const [optionRule, resultRule] = repository["option-result-constructor"].patterns;
+  assert.match(optionRule.match, /Some/);
+  assert.match(optionRule.match, /None/);
+  assert.match(resultRule.match, /Result/);
   assert.match(repository["propagation-operator"].match, /\\\?/);
   assert.match(repository["optional-access-operator"].match, /\\\?\\\./);
 
-  // The constructor rule must pair each namespace with its own variants:
-  // `Option::Ok` and `Result::Some` do not exist and must stay unhighlighted.
-  const constructor = new RegExp(repository["option-result-constructor"].match);
-  for (const source of [
-    "Option::Some(1)",
-    "Option::None",
-    "Result::Ok(1)",
-    "Result::Err(2)",
-    "Option :: None",
-  ]) {
-    assert.ok(constructor.test(source), `constructor rule does not highlight ${source}`);
+  const optionConstructor = new RegExp(optionRule.match);
+  const resultConstructor = new RegExp(resultRule.match);
+  for (const source of ["Some(1)", "Some (value) => value", "None", "None => 0"]) {
+    assert.equal(optionConstructor.exec(source)?.[1], source.startsWith("Some") ? "Some" : "None");
   }
-  for (const source of ["Option::Ok(1)", "Result::Some(1)", "Option::Err(2)", "Result::None"]) {
+  for (const source of ["Option::Some(1)", "Option::None", "obj.None", "obj.Some(1)", "Somewhere(1)", "None(x)", "Result::Some(1)"]) {
     assert.equal(
-      constructor.test(source),
+      optionConstructor.test(source),
       false,
-      `constructor rule highlights the non-existent ${source}`,
+      `bare Option rule highlights ${source}`,
     );
   }
   assert.deepEqual(
-    constructor.exec("Option::Some(1)")?.slice(1),
-    ["Option", "", "::", "", "Some"],
-    "constructor captures are 1=namespace, 3=::, 5=variant",
+    resultConstructor.exec("Result::Ok(1)")?.slice(1),
+    ["Result", "", "::", "", "Ok"],
+    "Result constructor captures are 1=namespace, 3=::, 5=variant",
   );
+  assert.ok(resultConstructor.test("Result::Err(2)"));
+  for (const source of ["Option::Ok(1)", "Option::Err(2)", "Result::Some(1)", "Result::None"]) {
+    assert.equal(resultConstructor.test(source), false, `Result rule highlights ${source}`);
+  }
 
   const includes = (grammar.patterns ?? []).map((pattern) => pattern.include);
   for (const key of [
@@ -275,12 +274,25 @@ test("documentation never presents null as a literal or T? as a type", () => {
   assert.deepEqual(violations, [], "documentation still teaches null or T?");
 });
 
+test("RustScript examples use only bare Option constructors and patterns", () => {
+  for (const relative of ["README.md", "language/lexical.md", "language/syntax.md", "language/grammar.md"]) {
+    const blocks = fencedBlocks(readDoc(join(repoRoot, relative)));
+    for (const block of blocks) {
+      assert.doesNotMatch(block, /Option::(?:Some|None)\b/, `${relative} contains an obsolete constructor example`);
+    }
+  }
+  const fixture = readDoc(fixturePath);
+  assert.match(fixture, /match value \{\s*Some\(inner\) => inner,\s*None => fallback,/);
+  assert.match(fixture, /match five \{\s*Some\(int\) => int \+ 1,\s*None => -1,/);
+  assert.doesNotMatch(fixture, /\blet\s+(?:Some|None)\b/);
+});
+
 test("documentation describes the current Unit/Option/Result contract", () => {
   const read = (relative) => readDoc(join(repoRoot, relative));
   const checks = [
     ["language/lexical.md", /`null` is neither a keyword nor a literal/],
-    ["language/syntax.md", /Option::Some\(0\)/],
-    ["language/syntax.md", /Option::None/],
+    ["language/syntax.md", /let present: Option<int> = Some\(0\)/],
+    ["language/syntax.md", /let absent: Option<int> = None/],
     ["language/syntax.md", /Result::Ok\(21\)/],
     ["language/syntax.md", /Result::Err\("bad input"\)/],
     ["language/grammar.md", /OptionType ::= "Option" "<" Type ">"/],
@@ -353,7 +365,7 @@ test("documentation describes the current Unit/Option/Result contract", () => {
   const syntax = read("language/syntax.md");
   const grammar = read("language/grammar.md");
 
-  // `Option::X(...)`/`Result::X(...)` bind; they are not type patterns.
+  // Option/Result constructor arms bind; they are not type patterns.
   assert.ok(
     !/Option::Some\(TypeName\)/.test(syntax),
     "syntax.md still lists Option::Some(TypeName) as a type pattern",
@@ -363,35 +375,14 @@ test("documentation describes the current Unit/Option/Result contract", () => {
     "syntax.md still lists Result::Ok(TypeName) as a type pattern",
   );
   assert.match(syntax, /always a binding name/, "syntax.md does not state the constructor binding rule");
-  assert.match(syntax, /Option::Some\(int\)/, "syntax.md does not show a type-shaped binding name");
-  assert.match(
-    syntax,
-    /Some\(\.\.\.\) and None match patterns require an optional value/,
-    "syntax.md does not document the legacy optional-slot rejection",
-  );
-  assert.ok(
-    !/falls back to value matching/.test(syntax),
-    "syntax.md still claims bare constructor names fall back to value matching",
-  );
-  assert.match(
-    syntax,
-    /bare `Ok\(value\)` or `Err\(value\)` arm is a parse error/,
-    "syntax.md does not document that bare Ok/Err arms are parse errors",
-  );
+  assert.match(syntax, /`Some\(int\)` declares a binding named `int`/, "syntax.md does not show a type-shaped binding name");
+  assert.match(syntax, /`Some\(TypeName\)` is retired as a type pattern in RustScript/);
+  assert.match(syntax, /legacy optional-slot patterns retain their behavior/);
   assert.ok(
     !/simply false for an `Option` carrier/.test(syntax),
     "syntax.md still claims every `Some(TypeName)` is false for an `Option` carrier",
   );
-  assert.match(
-    syntax,
-    /`Some\(map\)` and `Some\(Map\)` do match an `Option` carrier/,
-    "syntax.md does not document that `Some(map)` matches an `Option` carrier",
-  );
-  assert.match(
-    syntax,
-    /Result match cannot mix constructor arms with value patterns/,
-    "syntax.md does not document the separate Result mixing error",
-  );
+  assert.match(syntax, /`Some\(map\)`\/`Some\(Map\)` test the carrier itself/);
 
   // The `?.` receiver rule covers declared arrays and strings.
   assert.match(syntax, /data\?\.arr\?\.\[1\]/, "syntax.md does not show array projection");
@@ -406,13 +397,13 @@ test("documentation describes the current Unit/Option/Result contract", () => {
   );
   assert.match(
     syntax,
-    /a `bytes` receiver lowers to `Option::None`/,
+    /a `bytes` receiver lowers to `None`/,
     "syntax.md does not state the `bytes` projection boundary",
   );
 
-  // Grammar: one binding production, one legacy production, no dangling rule.
+  // Grammar: RSS constructor patterns are logical Option arms, not legacy patterns.
   assert.match(grammar, /MatchBinding ::= Identifier \| "_"/, "grammar.md has no MatchBinding production");
-  assert.match(grammar, /LegacyOptionalPattern ::=/, "grammar.md has no legacy pattern production");
+  assert.doesNotMatch(grammar, /LegacyOptionalPattern ::=/);
   assert.ok(
     !/"Option" "::" "Some" "\(" MatchTypeName/.test(grammar),
     "grammar.md still offers a type-name alternative for Option::Some",
@@ -421,9 +412,17 @@ test("documentation describes the current Unit/Option/Result contract", () => {
     !/"Result" "::" "(?:Ok|Err)" "\(" MatchTypeName/.test(grammar),
     "grammar.md still offers a type-name alternative for Result::Ok/Err",
   );
-  assert.match(grammar, /OptionNone ::= "Option" "::" "None"/, "grammar.md does not define OptionNone");
+  assert.match(grammar, /OptionSome ::= "Some" "\(" Expr "\)"/);
+  assert.match(grammar, /OptionNone ::= "None"/);
+  assert.doesNotMatch(grammar, /Option(?:Some|None) ::= "Option"/);
   const primary = grammar.split(/^PrimaryExpr ::=/m)[1]?.split(/^$/m)[0] ?? "";
+  assert.match(primary, /\| OptionSome/);
   assert.match(primary, /\| OptionNone/, "PrimaryExpr does not admit OptionNone");
+  const patterns = grammar.split(/^MatchPattern ::=/m)[1]?.split(/^```/m)[0] ?? "";
+  assert.match(patterns, /\| "Some" "\(" MatchBinding "\)"/);
+  assert.match(patterns, /\| "None"/);
+  assert.doesNotMatch(patterns, /"Option" "::"/);
+  assert.match(grammar, /other parser dialects, the legacy optional-slot patterns retain their behavior/);
 
   // The debugger note must not claim Unit and None share a carrier.
   const debuggerDoc = read("runtime/debugger.md");
@@ -441,8 +440,9 @@ test("documentation describes the current Unit/Option/Result contract", () => {
 test("the fixture exists and uses Unit, Option, Result, ? and ?.", () => {
   assert.ok(existsSync(fixturePath), `missing fixture ${fixturePath}`);
   const source = readDoc(fixturePath);
-  assert.match(source, /Option::Some\(/);
-  assert.match(source, /Option::None/);
+  assert.match(source, /Some\(/);
+  assert.match(source, /None/);
+  assert.doesNotMatch(source, /Option::(?:Some|None)/);
   assert.match(source, /Result::Ok\(/);
   assert.match(source, /Result::Err\(/);
   assert.match(source, /let unit: \(\) = \(\);/, "fixture does not declare a Unit value");

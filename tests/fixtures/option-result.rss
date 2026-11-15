@@ -21,16 +21,16 @@ fn explicit_unit() -> () { }
 // Option carried by the Boolean tag, not by payload truthiness.
 fn unwrap_or_absent(value: Option<int>, fallback: int) -> int {
     match value {
-        Option::Some(inner) => inner,
-        Option::None => fallback,
+        Some(inner) => inner,
+        None => fallback,
     }
 }
 
 // Option propagation: `?` exits this function on None.
 fn relay_option(flag: bool) -> Option<int> {
-    let value: Option<int> = if flag => { Option::Some(1) } else => { Option::None };
+    let value: Option<int> = if flag => { Some(1) } else => { None };
     let item = value?;
-    Option::Some(item + 1)
+    Some(item + 1)
 }
 
 // Result propagation: `?` returns the exact error type from this function.
@@ -63,24 +63,24 @@ println("unit_literal={}", "ok");
 println("unit_fn_returns_unit={}", "ok");
 
 // ---- Option ----
-let some: Option<int> = Option::Some(0);
-let none: Option<int> = Option::None;
-println("option_some={}", unwrap_or_absent(some, -1));
-println("option_none={}", unwrap_or_absent(none, -1));
+let present: Option<int> = Some(0);
+let absent: Option<int> = None;
+println("option_some={}", unwrap_or_absent(present, -1));
+println("option_none={}", unwrap_or_absent(absent, -1));
 
-let some_unit: Option<()> = Option::Some(());
+let some_unit: Option<()> = Some(());
 let some_unit_label = match some_unit {
-    Option::Some(inner) => "some_unit",
-    Option::None => "none",
+    Some(inner) => "some_unit",
+    None => "none",
 };
 println("option_some_unit={}", some_unit_label);
 
-// The identifier inside `Option::Some(...)` is a binding name, never a type
-// test: `Option::Some(int)` binds a local called `int`.
-let five: Option<int> = Option::Some(5);
+// The identifier inside `Some(...)` is a binding name, never a type
+// test: `Some(int)` binds a local called `int`.
+let five: Option<int> = Some(5);
 let bound_name = match five {
-    Option::Some(int) => int + 1,
-    Option::None => -1,
+    Some(int) => int + 1,
+    None => -1,
 };
 println("option_binding_is_binding={}", bound_name);
 
@@ -119,28 +119,28 @@ println("result_map_err={}", mapped_err);
 // ---- Result to Option ----
 let ok_as_option = ok_value.ok();
 let ok_payload = match ok_as_option {
-    Option::Some(value) => value,
-    Option::None => -1,
+    Some(value) => value,
+    None => -1,
 };
 println("result_ok_to_option={}", ok_payload);
 
 // ---- Fallible projection `?.` ----
 let record: Record = {name: "crab"};
 let projected = match record?.name {
-    Option::Some(value) => value,
-    Option::None => "missing",
+    Some(value) => value,
+    None => "missing",
 };
 println("project_field={}", projected);
 
 let table: map<string> = {"a": "one"};
 let absent_key = match table?.["b"] {
-    Option::Some(value) => value,
-    Option::None => "missing",
+    Some(value) => value,
+    None => "missing",
 };
 println("project_missing_key={}", absent_key);
 let present_key = match table?.["a"] {
-    Option::Some(value) => value,
-    Option::None => "missing",
+    Some(value) => value,
+    None => "missing",
 };
 println("project_present_key={}", present_key);
 
@@ -149,14 +149,14 @@ struct Grid { cells: [int] }
 
 let grid: Grid = {cells: [10, 20]};
 let grid_cell = match grid?.cells?.[1] {
-    Option::Some(value) => value,
-    Option::None => -1,
+    Some(value) => value,
+    None => -1,
 };
 println("project_array_index={}", grid_cell);
 
 let label: string = "abc";
 let label_letter = match label?.[1] {
-    Option::Some(value) => value,
-    Option::None => "missing",
+    Some(value) => value,
+    None => "missing",
 };
 println("project_string_index={}", label_letter);

@@ -102,7 +102,7 @@ OptionType ::= "Option" "<" Type ">"
 ResultType ::= "Result" "<" Type "," Type ">"
 ```
 
-Both `Result` parameters are required. `Option::None` has no payload from which to infer its parameter, so it needs an `Option<T>` annotation or another contextual type.
+Both `Result` parameters are required. `None` has no payload from which to infer its parameter, so it needs an `Option<T>` annotation or another contextual type.
 
 ## Expressions
 
@@ -117,9 +117,10 @@ UnaryExpr ::= ("&" "mut"? | "-" | "!" | "++") UnaryExpr | PrimaryExpr
 
 PrimaryExpr ::=
     Literal
+  | OptionSome
+  | OptionNone
   | Identifier CallSuffix?
   | Identifier "::" PathSegments TypeCallArgs? "(" ArgList? ")"
-  | OptionNone
   | "(" Expr ")"
   | ArrayLiteral
   | BraceLiteral
@@ -166,14 +167,14 @@ Map keys are never absent: a key is an identifier, string, bytes, integer, float
 ## Option, Result, and Unit values
 
 ```ebnf
-OptionSome ::= "Option" "::" "Some" "(" Expr ")"
-OptionNone ::= "Option" "::" "None"
+OptionSome ::= "Some" "(" Expr ")"
+OptionNone ::= "None"
 ResultOk ::= "Result" "::" "Ok" "(" Expr ")"
 ResultErr ::= "Result" "::" "Err" "(" Expr ")"
 UnitValue ::= "(" ")"
 ```
 
-`Option::Some`, `Result::Ok`, and `Result::Err` are ordinary namespace-qualified constructor calls, so they are already covered by `PrimaryExpr`'s namespace-call form. `Option::None` carries no argument list, so `PrimaryExpr` admits it explicitly through `OptionNone`. The bare forms `Some(...)`, `Ok(...)`, and `Err(...)` are not constructors: `Some(1)` is an unknown-function error, bare `None` in expression position is an unknown local, and `Ok(...)`/`Err(...)` are not valid match patterns either. Bare `None` and `Some(name)` survive only as legacy optional-slot match patterns, described below.
+In RustScript, `Some` and `None` are reserved constructor names in expression and pattern positions. The lexer still recognizes identifier tokens for them; the parser interprets them contextually. Neither may name an ordinary variable. Member names such as `obj.None` and quoted keys such as `{"None": 1}` remain available. `Option::Some` and `Option::None` are removed from RustScript's constructor syntax; other parser dialects retain their own behavior. `Result::Ok` and `Result::Err` remain namespace-qualified constructor calls covered by `PrimaryExpr`'s namespace-call form. Bare `Ok(...)` and `Err(...)` are not constructors or match patterns.
 
 ## If and match expressions
 
@@ -187,26 +188,19 @@ MatchPattern ::=
     IntLiteral
   | StringLiteral
   | BytesLiteral
-  | "Option" "::" "None"
-  | "Option" "::" "Some" "(" MatchBinding ")"
+  | "None"
+  | "Some" "(" MatchBinding ")"
   | "Result" "::" "Ok" "(" MatchBinding ")"
   | "Result" "::" "Err" "(" MatchBinding ")"
-  | LegacyOptionalPattern
   | "_"
 MatchBinding ::= Identifier | "_"
-
-LegacyOptionalPattern ::=
-    "None"
-  | "Some" "(" Identifier ")"
-  | "Some" "(" MatchTypeName ")"
-MatchTypeName ::= "int" | "Int" | "float" | "Float" | "number" | "Number" | "bool" | "Bool" | "string" | "String" | "bytes" | "Bytes" | "array" | "Array" | "map" | "Map"
 ```
 
-`MatchBinding` is a binding name or `_`, never a type test: `Option::Some(int)` binds a local named `int`. `Option::None` takes no payload, and `Option::None(x)` is rejected.
+`MatchBinding` is a binding name or `_`, never a type test: `Some(int)` binds a local named `int`. `None` takes no payload. These bare patterns match the logical `Option` variants, not a legacy optional slot. `Some(TypeName)` has no type-test meaning in RustScript: when the name is allowed as a binding, it binds the payload. For example, `Some(String)` binds a local named `String`.
 
-`LegacyOptionalPattern` is the retired optional-slot mechanism, kept here because the parser still accepts it. `Some(name)` binds a payload and needs a receiver that is a legacy optional slot, and `None` needs the same; a logical `Option` value is not an optional slot, so both fail with `Some(...) and None match patterns require an optional value`. `Some(TypeName)` is different: it carries no optional-slot precondition and compiles against any receiver, but it compares the receiver's runtime type name rather than a present payload, so the name it tests decides the result. An `Option` carrier is a `Value::Map` whose type name is `map`, so `Some(map)`/`Some(Map)` do match it, while `Some(int)`, `Some(float)`, `Some(bool)`, `Some(string)`, `Some(bytes)`, and `Some(array)` test the top-level value and are false against it; `Some(number)`/`Some(Number)` test two names, `int` or `float`, not one. `Some(_)` is rejected by the parser — `Some(_) is not supported; bind a name with Some(name)` — even though `_` sits in `Identifier` position here; only `Option::Some(_)` accepts a wildcard. All of them still need the trailing `_` arm. Legacy patterns cannot be mixed with constructor arms in one match, and the message names the constructor family: `Option match cannot mix constructor arms with value patterns` for an `Option` match, `Result match cannot mix constructor arms with value patterns` for a `Result` match. `Ok(...)`/`Err(...)` have no bare form at all — such an arm is a parse error.
+In other parser dialects, the legacy optional-slot patterns retain their behavior: `Some(name)` binds a present legacy optional-slot payload and `None` matches its absence. Their `Some(TypeName)` form is a runtime type-name test on the receiver, with no optional-slot precondition; it requires a trailing `_` arm. For a logical `Option` carrier, the top-level type is `map`: `Some(map)`/`Some(Map)` test that carrier type, while `Some(int)` and other payload type names test the carrier rather than the nested payload. `Some(number)`/`Some(Number)` test runtime `int` or `float`. This legacy interpretation does not apply in RustScript.
 
-An `Option` match is exhaustive with `Option::Some(binding)` and `Option::None`, and a `Result` match is exhaustive with `Result::Ok(binding)` and `Result::Err(binding)`. A wildcard may stand in for the absent branch when the present branch is a constructor arm. Nesting one constructor pattern inside another, and mixing `Option` and `Result` arms in the same match, are rejected; match the inner value in a second match instead. Literal matches still require a trailing `_` arm.
+An `Option` match is exhaustive with `Some(binding)` and `None`, and a `Result` match is exhaustive with `Result::Ok(binding)` and `Result::Err(binding)`. A wildcard may stand in for the absent branch when the present branch is a constructor arm. Nesting one constructor pattern inside another, and mixing `Option` and `Result` arms in the same match, are rejected; match the inner value in a second match instead. Literal matches still require a trailing `_` arm.
 
 ## Closures
 
