@@ -26,8 +26,8 @@ RustScript has no `null` literal and no `T?` optional type. Absence and failure 
 
 ```rss
 let unit: () = ();                          // Unit
-let some: Option<int> = Option::Some(0);    // present
-let none: Option<int> = Option::None;       // absent
+let present: Option<int> = Some(0);         // present
+let absent: Option<int> = None;            // absent
 let ok: Result<int, string> = Result::Ok(1);
 let err: Result<int, string> = Result::Err("bad input");
 ```
